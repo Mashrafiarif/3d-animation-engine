@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ADULTING.EXE — MAX'S FIRST DAY (15 second pilot)</title>
+<style>
+  html,body{margin:0;padding:0;overflow:hidden;width:100%;height:100%;background:#101726;color:white;font-family:system-ui,-apple-system,Arial,sans-serif}
+  canvas{display:block}
+  #top{position:absolute;top:6%;left:0;right:0;text-align:center;pointer-events:none;letter-spacing:3px;font-size:clamp(12px,2.2vw,24px);font-weight:900;text-shadow:0 2px 12px #10131e;opacity:.9}
+  #tag{display:block;letter-spacing:1.5px;margin-top:5px;font-size:0.58em;color:#d5ecff;font-weight:600}
+  #sub{position:absolute;bottom:12%;left:7%;width:86%;text-align:center;pointer-events:none}
+  #speaker{font-weight:900;letter-spacing:2px;font-size:clamp(12px,2.6vw,26px);margin-bottom:8px;text-shadow:0 2px 10px #000}
+  #caption{font-weight:950;line-height:1.15;font-size:clamp(22px,4.7vw,48px);text-shadow:0 3px 2px #000,2px 0 3px #000,-2px 0 3px #000,0 0 18px #000;white-space:pre-line}
+  #pill{position:absolute;bottom:4.5%;left:0;right:0;text-align:center;color:#a4acc2;font-size:clamp(9px,1.45vw,15px);letter-spacing:2px;font-weight:700;opacity:.75}
+</style>
+</head>
+<body>
+  <div id="top">ADULTING.EXE <span id="tag">MAX'S FIRST DAY • EPISODE 01</span></div>
+  <div id="sub"><div id="speaker"></div><div id="caption"></div></div>
+  <div id="pill">WORK • LIFE • AI • CHAOS</div>
+  <script type="module">
+  import * as THREE from '/node_modules/three/build/three.module.js';
+  const query = new URLSearchParams(location.search);
+  const W = Math.max(256,Number(query.get('w'))||540), H=Math.max(256,Number(query.get('h'))||960);
+  const portrait=H>W;
+  const renderer=new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true, powerPreference:'low-power'});
+  renderer.setSize(W,H,false);renderer.setPixelRatio(1); renderer.outputColorSpace=THREE.SRGBColorSpace;
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.29;
+  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  document.body.prepend(renderer.domElement);
+  const scene=new THREE.Scene();scene.background=new THREE.Color('#142133'); scene.fog=new THREE.FogExp2('#142133',0.018);
+  const cam=new THREE.PerspectiveCamera(portrait?37:40,W/H,.1,70);
+  const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
+  const C=(n)=>new THREE.Color(n);
+  const mat=(c,r=.6,m=0,opts={})=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m,...opts});
+  const mBasic=(c)=>new THREE.MeshBasicMaterial({color:c});
+  const smooth=(a,b,t)=>{let u=Math.min(1,Math.max(0,(t-a)/(b-a)));return u*u*(3-2*u)};
+  const lerp=(a,b,p)=>a+(b-a)*p;
+  function object(parent,g,m,x=0,y=0,z=0){const q=new THREE.Mesh(g,m);q.position.set(x,y,z);q.castShadow=true;q.receiveShadow=true;parent.add(q);return q;}
+  const S=(r=1)=>new THREE.SphereGeometry(r,20,14);
+  const box=(w,h,d)=>new THREE.BoxGeometry(w,h,d);
+  const capsule=(r,len)=>new THREE.CapsuleGeometry(r,len,5,12);
+  const tube=(a,b,r=0.05,m=mat('#182234'))=>{const s=b.clone().sub(a);const p=object(scene,new THREE.CylinderGeometry(r,r,1,9),m);p.position.copy(a).add(b).multiplyScalar(.5);p.quaternion.setFromUnitVectors(V(0,1,0),s.clone().normalize());p.scale.y=s.length();return p;};
+
+  scene.add(new THREE.HemisphereLight('#d7efff','#2a3250',2.4));
+  const key=new THREE.DirectionalLight('#fff6e8',3.0);key.position.set(-3,8,5);key.castShadow=true;
+  key.shadow.mapSize.set(1024,1024);Object.assign(key.shadow.camera,{left:-8,right:8,top:8,bottom:-8,near:.5,far:24});key.shadow.bias=-.00015;scene.add(key);
+  const rim=new THREE.DirectionalLight('#5ac6ff',1.4);rim.position.set(4,5,-4);scene.add(rim);
+  const accent=new THREE.PointLight('#c6ff00',1.3,8);accent.position.set(2.0,2.5,1.7);scene.add(accent);
+  const floor=object(scene,new THREE.PlaneGeometry(30,25),mat('#3c465b',.9,.02),0,-.045,0);floor.rotation.x=-Math.PI/2;
+  object(scene,box(12,5.2,.25),mat('#283951',.83,.03),0,2.5,-3.0);
+  object(scene,box(12,.12,.36),mat('#91d7ff',.24,.22),0,4.88,-2.73);
+  // A bright stylized city window; visual detail comes from true 3D meshes.
+  const glass=mat('#476d82',.23,.12,{transparent:true,opacity:.55});
+  for(const x of [-3.5,-1.4,.7,2.8]){
+    object(scene,box(1.80,2.5,.055),glass,x,2.75,-2.83);
+    object(scene,box(.075,2.58,.1),mat('#aabcc8',.48,.3),x-1.0,2.75,-2.73);
+    object(scene,box(1.77,.07,.085),mat('#b8cee2',.48,.3),x,2.75,-2.7);
+    for(let j=0;j<6;j++){
+      const h=.15+.10*((j*7+Math.round(x*12))%6);
+      object(scene,box(.17,h,.08),mat('#17283c'),x-0.67+j*.27,1.57+h*.5,-2.88);
+    }
+  }
+  // Additional office depth cues and furnishings.
+  const wood=mat('#a87455',.57,.04), steel=mat('#78899a',.38,.34),soft=mat('#bfd4de',.55,.01);
+  const table=object(scene,box(2.10,.13,.95),wood,1.65,1.06,-.62);
+  for(const x of [.82,2.48]) for(const z of [-.97,-.30])object(scene,box(.09,1.02,.09),steel,x,.54,z);
+  const monitor=object(scene,box(.96,.68,.07),mat('#111c2f',.28,.12),1.55,1.50,-.90);
+  object(scene,box(.81,.50,.011),mBasic('#76bed0'),1.55,1.52,-.85);
+  for(let i=0;i<4;i++)object(scene,box(.53,.035,.014),mBasic(i===0?'#e1f5f7':'#3b8997'),1.52,1.70-i*.10,-.834);
+  object(scene,box(.06,.23,.07),steel,1.55,1.13,-.95);
+  object(scene,new THREE.CylinderGeometry(.10,.10,.22,16),mat('#e7e0d5'),2.22,1.24,-.41);
+  const plantPot=object(scene,new THREE.CylinderGeometry(.18,.14,.28,16),mat('#c88360'),-3.0,.16,-1.7);
+  for(let i=0;i<9;i++){const l=object(scene,new THREE.ConeGeometry(.12,.70,7),mat(i%2?'#60a77e':'#86c29c'),-3+.19*Math.sin(i*2.4),.58,-1.7+.17*Math.cos(i*2.4));l.rotation.z=Math.sin(i*2)*.4;}
+  // Small freestanding satirical green 'RUN' button on the edge of the desk.
+  const buttonBase=object(scene,new THREE.CylinderGeometry(.23,.25,.12,20),mat('#151c27',.35,.1),2.36,1.18,-.22);
+  const runButton=object(scene,new THREE.CylinderGeometry(.17,.17,.09,20),mat('#c6ff00',.25,.02,{emissive:'#5a8b00',emissiveIntensity:.5}),2.36,1.27,-.22);
+  const buttonGlow=new THREE.PointLight('#baff16',1.1,2);buttonGlow.position.set(2.36,1.35,-.2);scene.add(buttonGlow);
+
+  // Shared reusable biped movement rig: root -> hip/body -> head and arm/leg pivots.
+  function human(name,{jacket,shirt,pants,skin,hair,tie,glasses=false}){
+    const root=new THREE.Group();scene.add(root);
+    const pivot=new THREE.Group();root.add(pivot);
+    const j=mat(jacket,.62,.04),sh=mat(shirt),pt=mat(pants),sk=mat(skin,.64),hr=mat(hair,.77),shoeMat=mat('#232b39',.63);
+    object(pivot,capsule(.35,.65),j,0,1.58,0);
+    object(pivot,box(.17,.53,.038),sh,0,1.64,.348);
+    if(tie){const t=object(pivot,new THREE.ConeGeometry(.08,.38,4),mat(tie,.44),0,1.67,.386);t.rotation.z=Math.PI;}
+    object(pivot,new THREE.SphereGeometry(.29,18,12),pt,0,1.02,0);
+    const neck=object(pivot,new THREE.CylinderGeometry(.12,.14,.21,14),sk,0,2.12,0);
+    const head=new THREE.Group();head.position.set(0,2.47,.01);pivot.add(head);
+    const skull=object(head,new THREE.SphereGeometry(.40,26,18),sk);skull.scale.set(1,.98,.89);
+    const nose=object(head,new THREE.SphereGeometry(.075,12,10),sk,0,-.04,.36);nose.scale.set(.82,1.02,1.12);
+    const cap=object(head,new THREE.SphereGeometry(.41,24,14),hr,0,.18,-.055);cap.scale.set(1,.60,.90);
+    for(let i=0;i<4;i++){
+      const lock=object(head,new THREE.SphereGeometry(.135,12,9),hr,-.22+i*.14,.36,.13);
+      lock.scale.set(1,.74,.75);
+    }
+    const eyes=[],brows=[];
+    for(const s of [-1,1]){
+      const eye=object(head,S(.052),mBasic('#172032'),s*.155,.055,.342);eyes.push(eye);
+      const brow=object(head,box(.15,.028,.03),hr,s*.158,.175,.338);brows.push(brow);
+      if(glasses){const lens=object(head,new THREE.TorusGeometry(.127,.018,7,26),mat('#192b3a',.3,.2),s*.16,.057,.348);lens.scale.set(1,.85,1);}
+    }
+    const smile=object(head,new THREE.TorusGeometry(.09,.011,4,22,Math.PI),mat('#543842'),0,-.19,.34);smile.rotation.z=Math.PI;
+    const mouthO=object(head,new THREE.SphereGeometry(.045,12,8),mat('#553847'),0,-.18,.350);mouthO.scale.set(1,1.3,.3);mouthO.visible=false;
+    const arms=[],legs=[];
+    for(const s of [-1,1]){
+      const a=new THREE.Group();a.position.set(s*.42,1.94,0);pivot.add(a);
+      object(a,new THREE.CapsuleGeometry(.115,.38,4,10),j,0,-.38,0);
+      const elbow=new THREE.Group();elbow.position.y=-.67;a.add(elbow);
+      object(elbow,new THREE.CapsuleGeometry(.085,.26,3,10),sk,0,-.22,0);
+      object(elbow,S(.105),sk,0,-.47,.01);arms.push({s,a,elbow});
+      const l=new THREE.Group();l.position.set(s*.18,1.07,0);pivot.add(l);
+      object(l,new THREE.CapsuleGeometry(.145,.25,4,10),pt,0,-.25,0);
+      const knee=new THREE.Group();knee.position.y=-.52;l.add(knee);
+      object(knee,new THREE.CapsuleGeometry(.125,.24,4,10),pt,0,-.23,0);
+      const foot=object(knee,new THREE.SphereGeometry(.18,16,12),shoeMat,0,-.45,.13);foot.scale.set(.9,.53,1.35);
+      legs.push({s,l,knee});
+    }
+    return {name,root,pivot,head,eyes,brows,arms,legs,smile,mouthO};
+  }
+  const max=human('MAX',{jacket:'#4978a9',shirt:'#ecf0e8',pants:'#3c4257',skin:'#dca985',hair:'#493126',tie:null});
+  const boss=human('BOSS',{jacket:'#384960',shirt:'#e7f2f5',pants:'#282d3d',skin:'#c99272',hair:'#c2c7d0',tie:'#dc6d56',glasses:true});
+  max.root.position.set(-3.30,0,.78); boss.root.position.set(.02,0,.16); boss.root.scale.set(.92,.92,.92);
+  // Our returning V3-style white/lime robot, fitted to the same root rig layout.
+  function robot(){
+    const root=new THREE.Group();scene.add(root);root.position.set(1.65,0,.18);
+    const pivot=new THREE.Group();root.add(pivot);
+    const white=mat('#e8f4fa',.27,.12),dark=mat('#1d2c44',.35,.08),lime=mat('#c6ff00',.27,.04,{emissive:'#577900',emissiveIntensity:.22});
+    object(pivot,capsule(.34,.51),white,0,1.33,0);
+    object(pivot,new THREE.CylinderGeometry(.14,.14,.03,20),lime,0,1.40,.347).rotation.x=Math.PI/2;
+    const head=new THREE.Group();head.position.set(0,2.19,0);pivot.add(head);
+    object(head,new THREE.SphereGeometry(.46,28,20),white);
+    const face=object(head,new THREE.SphereGeometry(.39,26,18),dark,0,.01,.19);face.scale.set(1,.70,.62);
+    const eyeM=mat('#c6ff00',.24,0,{emissive:'#83d900',emissiveIntensity:1.2});
+    const eyes=[];
+    for(const s of [-1,1])eyes.push(object(head,new THREE.SphereGeometry(.075,14,10),eyeM,s*.16,.05,.423));
+    object(head,new THREE.CylinderGeometry(.022,.029,.15,10),white,0,.49,0);
+    object(head,new THREE.SphereGeometry(.082,14,9),lime,0,.58,0);
+    const arms=[];
+    for(const s of [-1,1]){
+      const a=new THREE.Group();a.position.set(s*.42,1.66,0);pivot.add(a);
+      object(a,new THREE.CapsuleGeometry(.12,.35,4,10),white,0,-.32,0);
+      const elbow=new THREE.Group();elbow.position.y=-.57;a.add(elbow);
+      object(elbow,new THREE.CapsuleGeometry(.10,.22,4,10),dark,0,-.2,0);
+      object(elbow,new THREE.SphereGeometry(.14,14,10),lime,0,-.41,0);
+      arms.push({s,a,elbow});
+      const leg=new THREE.Group();leg.position.set(s*.19,.89,0);pivot.add(leg);
+      object(leg,new THREE.CapsuleGeometry(.13,.44,4,10),dark,0,-.39,0);
+      object(leg,new THREE.SphereGeometry(.19,16,10),lime,0,-.78,.08).scale.set(.95,.60,1.25);
+    }
+    return {root,pivot,head,arms,eyes};
+  }
+  const bot=robot();
+  const mail=[];
+  for(let i=0;i<5;i++){
+    const m=object(scene,box(.45,.27,.025),mat('#f9fdfd',.39,.01,{emissive:'#6fbfff',emissiveIntensity:.18}),1.68,2.35,-.12);
+    const flap=object(m,new THREE.ConeGeometry(.12,.20,3),mat('#6699b4'),0,0,.02);flap.rotation.z=Math.PI/2;
+    mail.push(m);
+  }
+
+  function aim(pos,target){cam.position.copy(pos);cam.lookAt(target);}
+  function subtitle(t){
+    const script=[
+      [0,3,'MAX','OKAY… FIRST DAY.\nNEW JOB. NEW LIFE.','#f7df9b'],
+      [3,6,'BOSS','MEET OUR NEW\nAI ASSISTANT.','#c7ddff'],
+      [6,9,'ROBOT','I ALREADY ANSWERED\nYOUR EMAILS.','#c6ff00'],
+      [9,12,'MAX','THEN… WHY DID\nYOU HIRE ME?','#f7df9b'],
+      [12,13.65,'ROBOT','TO CLICK…','#c6ff00'],
+      [13.65,15.1,'ROBOT','RUN WORKFLOW.','#c6ff00']
+    ];
+    const s=script.find(s=>t>=s[0]&&t<s[1])||script[script.length-1];
+    const a=document.querySelector('#speaker'),b=document.querySelector('#caption');
+    a.textContent=s[2];a.style.color=s[4];b.textContent=s[3];
+  }
+  function resetHuman(c){
+    c.pivot.position.y=0;c.pivot.rotation.set(0,0,0);c.head.rotation.set(0,0,0);
+    c.eyes.forEach(q=>q.scale.set(1,1,1));c.brows.forEach(q=>q.rotation.z=0);
+    c.arms.forEach(q=>{q.a.rotation.set(0,0,0);q.elbow.rotation.set(0,0,0)});
+    c.legs.forEach(q=>{q.l.rotation.set(0,0,0);q.knee.rotation.set(0,0,0)});
+    c.mouthO.visible=false;c.smile.visible=true;
+  }
+  // In this scene each timestamp generates the same pose: reproducible screenshots on GitHub.
+  window.renderAt=(time)=>{
+    const t=Math.max(0,Math.min(15,time));subtitle(t);
+    resetHuman(max);resetHuman(boss);
+    bot.head.rotation.set(0,0,0);bot.pivot.rotation.set(0,0,0);
+    bot.arms.forEach(a=>{a.a.rotation.set(0,0,0);a.elbow.rotation.set(0,0,0)});
+    bot.eyes.forEach(e=>e.scale.set(1,1,1));
+    max.root.position.x=lerp(-3.25,-1.45,smooth(.2,2.48,t));
+    if(t<2.5){
+      const gait=Math.sin(t*10.4)*(1-smooth(2.08,2.5,t));
+      max.pivot.position.y=.055*Math.abs(gait);
+      max.pivot.rotation.z=.045*Math.sin(t*10.4);
+      max.pivot.rotation.y=.045*Math.sin(t*5.2);
+      max.legs.forEach(q=>{q.l.rotation.x=q.s*.42*gait;q.knee.rotation.x=Math.max(0,q.s*gait)*.34;});
+      max.arms.forEach(q=>q.a.rotation.x=-q.s*gait*.28);
+      max.head.rotation.z=Math.sin(t*3.4)*.04;
+    }
+    if(t>2.15){max.pivot.rotation.y=.13*smooth(2.15,3,t);max.head.rotation.y=.1*smooth(2.5,3,t);}
+    // Boss points, then returns to idle.
+    const point=smooth(3.26,4.28,t)*(1-smooth(5.7,6.2,t));
+    boss.arms[1].a.rotation.z=1.28*point;
+    boss.arms[1].elbow.rotation.z=-.24*point;
+    boss.head.rotation.y=.19*point;
+    boss.pivot.rotation.z=.045*point;
+    // Robot wave and mechanical head turn.
+    const wave=smooth(6.1,6.55,t)*(1-smooth(8.65,9.3,t));
+    bot.arms[1].a.rotation.z=1.15*wave;bot.arms[1].elbow.rotation.z= -.36*wave+Math.sin(t*15)*.14*wave;
+    bot.head.rotation.y=-.18*smooth(5.7,7,t);
+    bot.pivot.position.y=Math.sin(t*3.7)*.02;
+    for(let i=0;i<mail.length;i++){
+      const e=mail[i];const v=smooth(6.45+i*.13,7.2+i*.13,t)*(1-smooth(8.7,9,t));
+      e.visible=v>.02;e.position.set(1.15+(i-2)*.34,2.28+.25*Math.sin(t*2.4+i),-.1+i*.035);
+      e.scale.setScalar(.03+v*.97);e.rotation.y=.13*(i-2);
+    }
+    if(t>=9){
+      const freeze=smooth(9,9.25,t);
+      max.head.rotation.z=.12*freeze;
+      max.brows[0].rotation.z=-.31*freeze;
+      max.brows[1].rotation.z=.31*freeze;
+      max.eyes.forEach(e=>e.scale.setScalar(lerp(1,1.27,freeze)));
+      max.mouthO.visible=t<12;max.smile.visible=t>=12;
+      max.arms[1].a.rotation.z=.62*freeze;
+      max.arms[1].elbow.rotation.x=-.62*freeze;
+    }
+    if(t>=12){
+      bot.head.rotation.z=-.18*smooth(12,13.25,t);
+      bot.arms[1].a.rotation.z=.62*smooth(12.35,13.55,t);
+      runButton.position.y=1.27-.028*smooth(13.32,13.58,t);
+      buttonGlow.intensity=1.1+1.9*smooth(13.32,13.64,t)*(1-smooth(14.12,14.55,t));
+    }else{runButton.position.y=1.27;buttonGlow.intensity=1.1;}
+    // 5 distinct camera compositions, no randomness or hidden timing assumptions.
+    const shots=[
+      [0,3,V(-3.3,2.65,6.3),V(-1.95,1.54,.35)],
+      [3,6,V(.85,2.71,6.8),V(.4,1.65,0)],
+      [6,9,V(2.70,2.63,4.55),V(1.60,1.70,.05)],
+      [9,12,V(-2.60,2.73,4.9),V(-1.38,1.82,.65)],
+      [12,13.65,V(2.60,2.51,4.3),V(1.62,1.63,.05)],
+      [13.65,15.01,V(-2.50,2.64,4.5),V(-1.47,1.9,.68)]
+    ];
+    const sh=shots.find(x=>t>=x[0]&&t<x[1])||shots[shots.length-1];
+    const u=smooth(sh[0]+.10,sh[1],t);
+    const cameraPos=sh[2].clone().add(V(-.18*u,.03*Math.sin(u*2),-.30*u));
+    const lookAt=sh[3].clone().add(V(0,.03*u,0));
+    aim(cameraPos,lookAt);
+    renderer.render(scene,cam);
+  };
+  window.renderAt(0);window.animationReady=true;
+  </script>
+</body>
+</html>
