@@ -4,30 +4,37 @@ on:
   workflow_dispatch:
     inputs:
       quality:
-        description: 'Resolution (start with preview)'
-        required: true
+        description: 'Image size (start with portrait-preview)'
         type: choice
-        default: preview
-        options: [preview, hd, full, portrait-preview, portrait-hd, portrait-full]
+        required: true
+        default: portrait-preview
+        options:
+          - portrait-preview
+          - portrait-hd
+          - portrait-full
+          - preview
+          - hd
+          - full
       fps:
-        description: 'Frames per second'
-        required: true
+        description: 'Frames per second (start with 24)'
         type: choice
+        required: true
         default: '24'
         options: ['24', '30', '60']
       seconds:
-        description: 'Video duration'
-        required: true
+        description: 'V3 test duration (five seconds recommended)'
         type: choice
-        default: '4'
-        options: ['4', '8', '12']
+        required: true
+        default: '5'
+        options: ['5', '4']
+
+permissions:
+  contents: read
 
 jobs:
   render:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,55 +43,66 @@ jobs:
       - name: Install project dependencies
         working-directory: threejs-demo
         run: npm install --no-audit --no-fund
-      - name: Install headless browser
+      - name: Install headless Chromium
         run: npx playwright install --with-deps --only-shell chromium
-      - name: Install FFmpeg and FFprobe
+      - name: Make FFmpeg available (required for video and audio)
         shell: bash
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
-      - name: Render 3D frames, generate SFX, and encode MP4
+      - name: Render V3 3D frames and synchronize original sound
+        shell: bash
+        working-directory: threejs-demo
         env:
           QUALITY: ${{ inputs.quality }}
           FPS: ${{ inputs.fps }}
           DURATION: ${{ inputs.seconds }}
-        shell: bash
-        working-directory: threejs-demo
         run: |
+          set -euo pipefail
           case "$QUALITY" in
+            portrait-preview) W=540; H=960 ;;
+            portrait-hd) W=720; H=1280 ;;
+            portrait-full) W=1080; H=1920 ;;
             preview) W=640; H=360 ;;
             hd) W=1280; H=720 ;;
             full) W=1920; H=1080 ;;
-            portrait-preview) W=360; H=640 ;;
-            portrait-hd) W=720; H=1280 ;;
-            portrait-full) W=1080; H=1920 ;;
-            *) echo "Unknown quality"; exit 1 ;;
+            *) echo "Unknown quality: $QUALITY"; exit 1 ;;
           esac
+          echo "Rendering ${W}x${H} @ ${FPS} fps for ${DURATION} seconds"
           node render.mjs --width "$W" --height "$H" --fps "$FPS" --seconds "$DURATION"
           python3 sound.py "$DURATION" output/sfx.wav
           if [[ -f narration.mp3 ]]; then
             ffmpeg -hide_banner -loglevel error -y \
               -framerate "$FPS" -i output/frame_%05d.png \
               -i output/sfx.wav -i narration.mp3 \
-              -filter_complex '[1:a]volume=0.35[sfx];[2:a]volume=1.0[voice];[sfx][voice]amix=inputs=2:duration=longest:dropout_transition=0[a]' \
-              -map 0:v -map '[a]' -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p \
+              -filter_complex '[1:a]volume=0.65[sfx];[2:a]volume=1.0[voice];[sfx][voice]amix=inputs=2:duration=longest:dropout_transition=0[a]' \
+              -map 0:v -map '[a]' -c:v libx264 -preset veryfast -crf 22 -pix_fmt yuv420p \
               -c:a aac -b:a 160k -t "$DURATION" -movflags +faststart output/animation.mp4
           else
             ffmpeg -hide_banner -loglevel error -y \
               -framerate "$FPS" -i output/frame_%05d.png \
               -i output/sfx.wav -map 0:v -map 1:a \
-              -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p \
+              -c:v libx264 -preset veryfast -crf 22 -pix_fmt yuv420p \
               -c:a aac -b:a 160k -t "$DURATION" -movflags +faststart output/animation.mp4
           fi
-          ffprobe -v error -show_entries format=duration -of default=nw=1 output/animation.mp4
-      - name: Downloadable video and audio
+          ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -show_entries format=duration \
+            -of default=nw=1 output/animation.mp4
+          cp output/frame_00000.png output/preview_start.png
+          cp "output/frame_$(printf '%05d' "$(( FPS * 7 / 2 ))").png" output/preview_contact.png
+          cp "output/frame_$(printf '%05d' "$(( FPS * (DURATION - 1) + FPS / 2 ))").png" output/preview_reaction.png
+      - name: Download MP4, stereo sound, and 3 actual engine-rendered stills
         uses: actions/upload-artifact@v4
         with:
-          name: threejs-demo-video-with-sound
+          name: threejs-v3-character-action
           path: |
             threejs-demo/output/animation.mp4
             threejs-demo/output/sfx.wav
+            threejs-demo/output/preview_start.png
+            threejs-demo/output/preview_contact.png
+            threejs-demo/output/preview_reaction.png
           retention-days: 3
           compression-level: 0
