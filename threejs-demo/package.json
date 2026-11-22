@@ -1,0 +1,12 @@
+{
+  "name": "iphone-threejs-video-engine",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.56.0",
+    "three": "^0.180.0"
+  }
+}

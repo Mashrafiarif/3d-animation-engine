@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Code-generated 3D animation</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #101520; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script type="module">
+  import * as THREE from '/node_modules/three/build/three.module.js';
+
+  const params = new URLSearchParams(location.search);
+  const width = Math.max(320, Number(params.get('w')) || 640);
+  const height = Math.max(180, Number(params.get('h')) || 360);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(width, height, false);
+  renderer.setPixelRatio(1);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.35;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#111827');
+  scene.fog = new THREE.Fog('#111827', 9, 24);
+  const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+  const target = new THREE.Vector3(0, 0.1, 0);
+
+  const ambient = new THREE.HemisphereLight(0xe9f5ff, 0x485067, 2.6);
+  scene.add(ambient);
+  const key = new THREE.DirectionalLight(0xffffff, 4);
+  key.position.set(-3, 7, 6);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.camera.left = -6;
+  key.shadow.camera.right = 6;
+  key.shadow.camera.top = 6;
+  key.shadow.camera.bottom = -6;
+  scene.add(key);
+  const rim = new THREE.PointLight(0xc6ff00, 24, 12);
+  rim.position.set(2, 1.4, -2);
+  scene.add(rim);
+
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(200, 200),
+    new THREE.MeshStandardMaterial({ color: '#202d3b', roughness: 0.86, metalness: 0.08 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -1.78;
+  floor.receiveShadow = true;
+  scene.add(floor);
+  const grid = new THREE.GridHelper(35, 35, 0x32485f, 0x293646);
+  grid.position.y = -1.773;
+  scene.add(grid);
+
+  const white = new THREE.MeshStandardMaterial({ color: '#f5f5f5', roughness: 0.38, metalness: 0.05 });
+  const navy = new THREE.MeshStandardMaterial({ color: '#121c2d', roughness: 0.35, metalness: 0.12 });
+  const lime = new THREE.MeshStandardMaterial({ color: '#c6ff00', emissive: '#608800', emissiveIntensity: 0.22, roughness: 0.3 });
+  const dark = new THREE.MeshStandardMaterial({ color: '#0b1018', roughness: 0.34 });
+  const rose = new THREE.MeshStandardMaterial({ color: '#ff728e', emissive: '#6a1020', emissiveIntensity: 0.15 });
+
+  function mesh(geom, mat, x, y, z, parent) {
+    const m = new THREE.Mesh(geom, mat);
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    parent.add(m);
+    return m;
+  }
+  const mascot = new THREE.Group();
+  scene.add(mascot);
+  mesh(new THREE.CapsuleGeometry(0.46, 0.70, 6, 16), white, 0, -0.25, 0, mascot);
+  mesh(new THREE.SphereGeometry(0.57, 32, 24), white, 0, 0.93, 0, mascot);
+  // Eyes, blush and lime head antenna emphasize real 3D depth.
+  for (const side of [-1, 1]) {
+    mesh(new THREE.SphereGeometry(0.105, 16, 12), dark, side * 0.20, 1.00, 0.52, mascot);
+    mesh(new THREE.SphereGeometry(0.055, 12, 8), rose, side * 0.34, 0.78, 0.44, mascot);
+    mesh(new THREE.CapsuleGeometry(0.14, 0.48, 6, 12), navy, side * 0.28, -1.17, 0, mascot);
+    mesh(new THREE.SphereGeometry(0.20, 16, 12), lime, side * 0.28, -1.58, 0.12, mascot);
+  }
+  mesh(new THREE.TorusGeometry(0.11, 0.025, 8, 24, Math.PI), dark, 0, 0.79, 0.537, mascot);
+  mesh(new THREE.CylinderGeometry(0.055, 0.08, 0.24, 16), lime, 0, 1.57, 0, mascot);
+  mesh(new THREE.SphereGeometry(0.125, 20, 12), lime, 0, 1.74, 0, mascot);
+  mesh(new THREE.CircleGeometry(0.23, 32), lime, 0, -0.13, 0.47, mascot);
+
+  function arm(side) {
+    const pivot = new THREE.Group();
+    pivot.position.set(side * 0.5, 0.06, 0);
+    mascot.add(pivot);
+    const limb = mesh(new THREE.CapsuleGeometry(0.15, 0.58, 6, 12), white, side * 0.18, -0.37, 0, pivot);
+    limb.rotation.z = side * -0.35;
+    mesh(new THREE.SphereGeometry(0.18, 16, 12), lime, side * 0.29, -0.77, 0.03, pivot);
+    return pivot;
+  }
+  const leftArm = arm(-1);
+  const rightArm = arm(1);
+
+  // Actual 3D orbiting props with depth, shading and independent motion.
+  const props = new THREE.Group();
+  scene.add(props);
+  const cubes = [];
+  for (let i = 0; i < 4; i++) {
+    const mat = i % 2 === 0 ? lime : rose;
+    const cube = mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), mat, 0, 0, 0, props);
+    cubes.push(cube);
+  }
+  const ring = mesh(new THREE.TorusGeometry(1.88, 0.035, 8, 80), lime, 0, -0.10, -0.9, scene);
+  ring.rotation.x = -0.20;
+
+  // The cloud renderer asks for exact times instead of depending on real-time playback.
+  window.renderAt = (time) => {
+    const t = Number(time) || 0;
+    mascot.position.y = Math.sin(t * 4.0) * 0.115;
+    mascot.rotation.y = Math.sin(t * 1.4) * 0.23;
+    mascot.rotation.z = Math.sin(t * 2.0) * 0.04;
+    rightArm.rotation.z = -0.72 + Math.sin(t * 8) * 0.38;
+    leftArm.rotation.z = 0.18 + Math.sin(t * 2.6) * 0.18;
+    props.rotation.y = t * 0.48;
+    cubes.forEach((cube, i) => {
+      const angle = t * (i % 2 === 0 ? 0.75 : -0.68) + i * Math.PI / 2;
+      cube.position.set(Math.cos(angle) * 2.38, 0.15 + Math.sin(t * 2.2 + i) * 0.5, Math.sin(angle) * 1.2 - 0.5);
+      cube.rotation.set(t * 0.6 + i, t * 0.9 + i, t * 0.4);
+    });
+    ring.rotation.z = t * 0.42;
+    const azimuth = 0.12 * Math.sin(t * 0.9);
+    camera.position.set(Math.sin(azimuth) * 7.5, 2.25 + Math.sin(t * 0.4) * 0.13, Math.cos(azimuth) * 7.5);
+    camera.lookAt(target);
+    renderer.render(scene, camera);
+    renderer.getContext().finish();
+    return true;
+  };
+  window.renderAt(0);
+  window.animationReady = true;
+</script>
+</body>
+</html>
