@@ -1,143 +1,257 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Code-generated 3D animation</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meanwhile Mash | Code-generated 3D character story</title>
   <style>
-    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #101520; }
-    canvas { display: block; }
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b1018}
+    canvas{display:block}
   </style>
 </head>
 <body>
 <script type="module">
-  import * as THREE from '/node_modules/three/build/three.module.js';
+import * as THREE from '/node_modules/three/build/three.module.js';
 
-  const params = new URLSearchParams(location.search);
-  const width = Math.max(320, Number(params.get('w')) || 640);
-  const height = Math.max(180, Number(params.get('h')) || 360);
+// This is deterministic: GitHub's renderer requests an exact time for every frame.
+const qs = new URLSearchParams(location.search);
+const W = Math.max(160, Number(qs.get('w')) || 640);
+const H = Math.max(160, Number(qs.get('h')) || 360);
+const portrait = H > W;
+const renderer = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true, powerPreference:'low-power' });
+renderer.setSize(W,H,false);
+renderer.setPixelRatio(1);
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.33;
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-  renderer.setSize(width, height, false);
-  renderer.setPixelRatio(1);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.35;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  document.body.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x0b1018);
+scene.fog=new THREE.FogExp2(0x0b1018,0.030);
+const camera=new THREE.PerspectiveCamera(portrait?47:42,W/H,.1,100);
 
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#111827');
-  scene.fog = new THREE.Fog('#111827', 9, 24);
-  const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
-  const target = new THREE.Vector3(0, 0.1, 0);
+const mat=(color,roughness=.46,metalness=.08,extra={})=>new THREE.MeshStandardMaterial({color,roughness,metalness,...extra});
+const shell=mat('#f5f7f7',.29,.13);
+const shellShadow=mat('#d8e1e4',.37,.08);
+const ink=mat('#0b1018',.3,.13);
+const navy=mat('#17152f',.35,.22);
+const lime=mat('#c6ff00',.3,.1,{emissive:'#496100',emissiveIntensity:.32});
+const limeGlow=new THREE.MeshStandardMaterial({color:'#d9ff65',emissive:'#c6ff00',emissiveIntensity:1.5,roughness:.18,metalness:.1});
+const blush=mat('#f2aab5',.63,0);
+const stageMat=mat('#20283c',.48,.28);
+const baseMat=mat('#202c3a',.6,.2);
 
-  const ambient = new THREE.HemisphereLight(0xe9f5ff, 0x485067, 2.6);
-  scene.add(ambient);
-  const key = new THREE.DirectionalLight(0xffffff, 4);
-  key.position.set(-3, 7, 6);
-  key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
-  key.shadow.camera.left = -6;
-  key.shadow.camera.right = 6;
-  key.shadow.camera.top = 6;
-  key.shadow.camera.bottom = -6;
-  scene.add(key);
-  const rim = new THREE.PointLight(0xc6ff00, 24, 12);
-  rim.position.set(2, 1.4, -2);
-  scene.add(rim);
+function addMesh(parent,geometry,material,x=0,y=0,z=0,cast=true){
+  const m=new THREE.Mesh(geometry,material);
+  m.position.set(x,y,z);
+  m.castShadow=cast;
+  m.receiveShadow=true;
+  parent.add(m);
+  return m;
+}
+const sph=(r=1,ws=20,hs=14)=>new THREE.SphereGeometry(r,ws,hs);
+const v=(x,y,z)=>new THREE.Vector3(x,y,z);
+const clamp=(u)=>Math.max(0,Math.min(1,u));
+const smooth=(a,b,t)=>{const u=clamp((t-a)/(b-a));return u*u*(3-2*u)};
+const lerp=(a,b,t)=>a+(b-a)*t;
+const mixVec=(a,b,t)=>a.clone().lerp(b,t);
 
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(200, 200),
-    new THREE.MeshStandardMaterial({ color: '#202d3b', roughness: 0.86, metalness: 0.08 })
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -1.78;
-  floor.receiveShadow = true;
-  scene.add(floor);
-  const grid = new THREE.GridHelper(35, 35, 0x32485f, 0x293646);
-  grid.position.y = -1.773;
-  scene.add(grid);
+// Studio: restrained details, a real floor, pedestal, soft shadows, and depth.
+scene.add(new THREE.HemisphereLight(0xe6f5ff,0x29324a,2.1));
+const key=new THREE.DirectionalLight(0xffffff,3.2);
+key.position.set(-3.4,6.8,5);
+key.castShadow=true;
+key.shadow.mapSize.set(1024,1024);
+key.shadow.camera.left=-5;key.shadow.camera.right=5;
+key.shadow.camera.top=5;key.shadow.camera.bottom=-5;
+key.shadow.normalBias=.03;
+scene.add(key);
+const rim=new THREE.DirectionalLight(0x9bf5e6,2.0);rim.position.set(3.5,4.2,-4);scene.add(rim);
+const magenta=new THREE.PointLight(0x9a68ff,6,10);magenta.position.set(-3,1.8,-2);scene.add(magenta);
+const floor=addMesh(scene,new THREE.PlaneGeometry(150,150),mat('#141b29',.88,.06),0,-.04,0,false);
+floor.rotation.x=-Math.PI/2;
+const roundStage=addMesh(scene,new THREE.CylinderGeometry(3.25,3.4,.16,72),stageMat,-.30,.025,-.28,false);
+const ringMat=new THREE.MeshBasicMaterial({color:0x6b9276,transparent:true,opacity:.28,depthWrite:false});
+const ring=addMesh(scene,new THREE.TorusGeometry(2.86,.013,6,88),ringMat,-.30,.115,-.28,false);
+ring.rotation.x=Math.PI/2;
+for(const x of [-3.2,3.1]){
+  const column=addMesh(scene,new THREE.BoxGeometry(.1,3.4,.12),mat('#314358',.55,.3),x,1.68,-2.8,false);
+  addMesh(scene,new THREE.BoxGeometry(.018,3.1,.018),new THREE.MeshBasicMaterial({color:x<0?0x8a76c9:0x748c6a}),x,1.68,-2.72,false);
+}
+// Plinth stays fixed: the object can be seen before the robot reaches for it.
+const standPos=v(.88,0,.28);
+const stand=addMesh(scene,new THREE.CylinderGeometry(.40,.43,.82,32),baseMat,standPos.x,.42,standPos.z);
+const standTop=addMesh(scene,new THREE.CylinderGeometry(.43,.43,.055,32),navy,standPos.x,.857,standPos.z);
+const standRim=addMesh(scene,new THREE.TorusGeometry(.38,.021,6,48),lime,standPos.x,.891,standPos.z,false);
+standRim.rotation.x=Math.PI/2;
+const standOrbPos=v(standPos.x,1.17,standPos.z);
 
-  const white = new THREE.MeshStandardMaterial({ color: '#f5f5f5', roughness: 0.38, metalness: 0.05 });
-  const navy = new THREE.MeshStandardMaterial({ color: '#121c2d', roughness: 0.35, metalness: 0.12 });
-  const lime = new THREE.MeshStandardMaterial({ color: '#c6ff00', emissive: '#608800', emissiveIntensity: 0.22, roughness: 0.3 });
-  const dark = new THREE.MeshStandardMaterial({ color: '#0b1018', roughness: 0.34 });
-  const rose = new THREE.MeshStandardMaterial({ color: '#ff728e', emissive: '#6a1020', emissiveIntensity: 0.15 });
+// Character: all features are true 3D meshes, not a 2D sprite.
+const hero=new THREE.Group();scene.add(hero);
+const torso=addMesh(hero,new THREE.CapsuleGeometry(.39,.63,5,20),shell,0,1.24,0);
+addMesh(hero,new THREE.SphereGeometry(.39,20,14),shellShadow,0,.90,0);
+const chest=addMesh(hero,new THREE.CylinderGeometry(.21,.21,.04,36),navy,0,1.29,.396);
+chest.rotation.x=Math.PI/2;
+const chestLight=addMesh(hero,new THREE.CylinderGeometry(.14,.14,.045,36),lime,0,1.29,.420);
+chestLight.rotation.x=Math.PI/2;
 
-  function mesh(geom, mat, x, y, z, parent) {
-    const m = new THREE.Mesh(geom, mat);
-    m.position.set(x, y, z);
-    m.castShadow = true;
-    m.receiveShadow = true;
-    parent.add(m);
-    return m;
+const head=new THREE.Group();head.position.set(0,2.07,0);hero.add(head);
+addMesh(head,sph(.49,32,24),shell);
+const visor=addMesh(head,new THREE.SphereGeometry(.395,28,18),ink,0,.035,.285);
+visor.scale.set(1.0,.65,.43);
+const eyes=[];
+for(const side of [-1,1]){
+  const e=addMesh(head,sph(.085,20,14),limeGlow,side*.19,.07,.422);eyes.push(e);
+  const cheek=addMesh(head,sph(.055,12,8),blush,side*.35,-.16,.335);cheek.scale.set(1,.75,.52);
+}
+const mouth=addMesh(head,new THREE.TorusGeometry(.10,.018,6,22,Math.PI),lime,0,-.13,.446);
+mouth.rotation.z=Math.PI;
+const antenna=addMesh(head,new THREE.CylinderGeometry(.039,.055,.16,12),shell,0,.525,0);
+addMesh(head,sph(.105,16,12),lime,0,.64,0);
+
+// Jointed legs rotate independently. Tiny foot roll makes the walk readable.
+const legs=[];
+for(const side of [-1,1]){
+  const pivot=new THREE.Group();pivot.position.set(side*.225,.85,.015);hero.add(pivot);
+  addMesh(pivot,new THREE.CapsuleGeometry(.14,.42,4,14),navy,0,-.385,0);
+  const foot=addMesh(pivot,new THREE.SphereGeometry(.18,18,12),lime,0,-.725,.14);
+  foot.scale.set(1.17,.65,1.55);
+  legs.push({pivot,foot,side});
+}
+// Arms are two actual 3D segments; elbows and hands follow specified target points.
+function limb(side){
+  const group=new THREE.Group();hero.add(group);
+  const upper=addMesh(group,new THREE.CylinderGeometry(.12,.13,1,14),shell);
+  const lower=addMesh(group,new THREE.CylinderGeometry(.115,.09,1,14),shellShadow);
+  const elbow=addMesh(group,sph(.145,16,12),shell);
+  const hand=addMesh(group,sph(.156,18,12),lime);
+  const shoulder=addMesh(group,sph(.19,16,12),shell,side*.49,1.56,0);
+  return {side,group,upper,lower,elbow,hand,shoulder};
+}
+const arms={left:limb(-1),right:limb(1)};
+const yAxis=v(0,1,0);
+function segment(mesh,a,b){
+  const d=b.clone().sub(a), length=Math.max(.001,d.length());
+  mesh.position.copy(a).add(b).multiplyScalar(.5);
+  mesh.quaternion.setFromUnitVectors(yAxis,d.multiplyScalar(1/length));
+  mesh.scale.set(1,length,1);
+}
+function setArm(arm,handPos,bend){
+  const sh=v(arm.side*.49,1.55,0);
+  // Bend lies behind the wrist, revealing a distinct elbow rather than a stick.
+  const el=sh.clone().lerp(handPos,.52).add(v(arm.side*bend,-.14,-.23));
+  segment(arm.upper,sh,el);segment(arm.lower,el,handPos);
+  arm.elbow.position.copy(el);arm.hand.position.copy(handPos);
+}
+
+// A single purposeful prop: a floating crystal that the hero picks up.
+const energy=new THREE.Group();scene.add(energy);
+const gem=addMesh(energy,new THREE.IcosahedronGeometry(.26,1),limeGlow);
+const gemCore=addMesh(energy,new THREE.IcosahedronGeometry(.105,0),shell);
+const halo=addMesh(energy,new THREE.TorusGeometry(.37,.016,6,36),lime,0,0,0,false);
+halo.rotation.x=.55;
+const light=new THREE.PointLight(0xc6ff00,3.5,3);energy.add(light);
+const sparkMat=new THREE.MeshBasicMaterial({color:0xd7ff62,transparent:true,opacity:.0,depthWrite:false});
+const sparkles=[];
+for(let i=0;i<12;i++){
+  const s=addMesh(scene,sph(.025+(i%3)*.007,8,6),sparkMat,0,-30,0,false);
+  sparkles.push(s);
+}
+
+function sceneAt(t){
+  t=Math.max(0,Number(t)||0);
+  const walk=1-smooth(1.62,2.02,t);
+  const approach=smooth(0,1.85,t);
+  hero.position.set(lerp(-1.83,-.43,approach),0,0);
+  const stride=t*9.2;
+  hero.position.y=walk*(.027+.045*Math.abs(Math.sin(stride)))+ .012*Math.sin(t*2.4);
+  const turn=smooth(6.35,7.35,t);
+  hero.rotation.y=lerp(-.08,.98,turn);
+  hero.rotation.z=(-.045*walk*Math.sin(stride)+.04*smooth(2.6,3.35,t)*(1-smooth(4,4.8,t)));
+  for(const leg of legs){
+    leg.pivot.rotation.x=leg.side*Math.sin(stride)*.48*walk;
+    leg.pivot.rotation.z=leg.side*.04*walk;
   }
-  const mascot = new THREE.Group();
-  scene.add(mascot);
-  mesh(new THREE.CapsuleGeometry(0.46, 0.70, 6, 16), white, 0, -0.25, 0, mascot);
-  mesh(new THREE.SphereGeometry(0.57, 32, 24), white, 0, 0.93, 0, mascot);
-  // Eyes, blush and lime head antenna emphasize real 3D depth.
-  for (const side of [-1, 1]) {
-    mesh(new THREE.SphereGeometry(0.105, 16, 12), dark, side * 0.20, 1.00, 0.52, mascot);
-    mesh(new THREE.SphereGeometry(0.055, 12, 8), rose, side * 0.34, 0.78, 0.44, mascot);
-    mesh(new THREE.CapsuleGeometry(0.14, 0.48, 6, 12), navy, side * 0.28, -1.17, 0, mascot);
-    mesh(new THREE.SphereGeometry(0.20, 16, 12), lime, side * 0.28, -1.58, 0.12, mascot);
-  }
-  mesh(new THREE.TorusGeometry(0.11, 0.025, 8, 24, Math.PI), dark, 0, 0.79, 0.537, mascot);
-  mesh(new THREE.CylinderGeometry(0.055, 0.08, 0.24, 16), lime, 0, 1.57, 0, mascot);
-  mesh(new THREE.SphereGeometry(0.125, 20, 12), lime, 0, 1.74, 0, mascot);
-  mesh(new THREE.CircleGeometry(0.23, 32), lime, 0, -0.13, 0.47, mascot);
+  head.rotation.z=.055*Math.sin(t*1.8)+.16*(smooth(1.95,2.28,t)-smooth(2.60,2.94,t));
+  head.rotation.y=.23*(smooth(1.88,2.28,t)-smooth(3.95,4.35,t))-.20*turn;
+  head.position.y=2.07+.018*Math.sin(t*3.3)+.055*(smooth(4.8,5.12,t)-smooth(5.55,5.9,t));
+  const blink=Math.exp(-Math.pow((t-2.45)/.08,2)) + Math.exp(-Math.pow((t-5.55)/.08,2));
+  for(const eye of eyes)eye.scale.y=1-.90*Math.min(1,blink);
 
-  function arm(side) {
-    const pivot = new THREE.Group();
-    pivot.position.set(side * 0.5, 0.06, 0);
-    mascot.add(pivot);
-    const limb = mesh(new THREE.CapsuleGeometry(0.15, 0.58, 6, 12), white, side * 0.18, -0.37, 0, pivot);
-    limb.rotation.z = side * -0.35;
-    mesh(new THREE.SphereGeometry(0.18, 16, 12), lime, side * 0.29, -0.77, 0.03, pivot);
-    return pivot;
-  }
-  const leftArm = arm(-1);
-  const rightArm = arm(1);
+  // Stage 2: reach for stationary gem; Stage 3: lift it; Stage 4: react.
+  const reach=smooth(2.48,3.50,t);
+  const lift=smooth(3.48,4.70,t);
+  const presentation=smooth(5.30,5.92,t);
+  const standLocal=v(standOrbPos.x-hero.position.x,standOrbPos.y-hero.position.y,standOrbPos.z);
+  // Convert the world-space pedestal position into hero-local coordinates.
+  const inv=v(standLocal.x,standLocal.y,standLocal.z).applyAxisAngle(v(0,1,0),-hero.rotation.y);
+  const idleHand=v(.80,.83,.30);
+  const showHand=v(.59,1.65,.59);
+  const finalHand=v(.73,1.80,.68);
+  let handRight=mixVec(idleHand,inv,reach);
+  if(lift>0)handRight=mixVec(inv,showHand,lift);
+  if(presentation>0)handRight=mixVec(handRight,finalHand,presentation);
+  setArm(arms.right,handRight,-.13);
+  const leftIdle=v(-.72,.88,.25);
+  const surprise=smooth(4.66,5.17,t)*(1-smooth(6.15,6.65,t));
+  setArm(arms.left,mixVec(leftIdle,v(-.56,1.78,.50),surprise),.18);
 
-  // Actual 3D orbiting props with depth, shading and independent motion.
-  const props = new THREE.Group();
-  scene.add(props);
-  const cubes = [];
-  for (let i = 0; i < 4; i++) {
-    const mat = i % 2 === 0 ? lime : rose;
-    const cube = mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), mat, 0, 0, 0, props);
-    cubes.push(cube);
+  if(t<3.48){
+    energy.position.copy(standOrbPos);
+    energy.position.y+=.035*Math.sin(t*4.4);
+  }else{
+    energy.position.copy(hero.localToWorld(handRight.clone()));
   }
-  const ring = mesh(new THREE.TorusGeometry(1.88, 0.035, 8, 80), lime, 0, -0.10, -0.9, scene);
-  ring.rotation.x = -0.20;
+  energy.rotation.set(.13+.42*t,.32*t,.12*Math.sin(t));
+  const glow=smooth(4.57,5.02,t)*(1-.35*smooth(6.30,7.6,t));
+  const pulse=1+ .17*glow*Math.sin((t-4.65)*12);
+  energy.scale.setScalar(pulse);
+  light.intensity=3+8*glow;
+  chestLight.material.emissiveIntensity=.3+1.2*glow;
+  for(let i=0;i<sparkles.length;i++){
+    const p=sparkles[i];
+    const visible=glow*(1-smooth(6.6,7.4,t));
+    const ang=(i*2.39996)+(t-4.5)*(.5+(i%3)*.12);
+    const rr=.30+(i%4)*.09+.12*Math.abs(Math.sin(t*3+i));
+    p.position.copy(energy.position).add(v(Math.cos(ang)*rr,Math.sin(ang*1.2)*rr,Math.sin(ang)*rr));
+    p.scale.setScalar(Math.max(.01,visible));
+  }
+  sparkMat.opacity=.9*glow*(1-smooth(6.6,7.4,t));
 
-  // The cloud renderer asks for exact times instead of depending on real-time playback.
-  window.renderAt = (time) => {
-    const t = Number(time) || 0;
-    mascot.position.y = Math.sin(t * 4.0) * 0.115;
-    mascot.rotation.y = Math.sin(t * 1.4) * 0.23;
-    mascot.rotation.z = Math.sin(t * 2.0) * 0.04;
-    rightArm.rotation.z = -0.72 + Math.sin(t * 8) * 0.38;
-    leftArm.rotation.z = 0.18 + Math.sin(t * 2.6) * 0.18;
-    props.rotation.y = t * 0.48;
-    cubes.forEach((cube, i) => {
-      const angle = t * (i % 2 === 0 ? 0.75 : -0.68) + i * Math.PI / 2;
-      cube.position.set(Math.cos(angle) * 2.38, 0.15 + Math.sin(t * 2.2 + i) * 0.5, Math.sin(angle) * 1.2 - 0.5);
-      cube.rotation.set(t * 0.6 + i, t * 0.9 + i, t * 0.4);
-    });
-    ring.rotation.z = t * 0.42;
-    const azimuth = 0.12 * Math.sin(t * 0.9);
-    camera.position.set(Math.sin(azimuth) * 7.5, 2.25 + Math.sin(t * 0.4) * 0.13, Math.cos(azimuth) * 7.5);
-    camera.lookAt(target);
-    renderer.render(scene, camera);
-    renderer.getContext().finish();
-    return true;
-  };
-  window.renderAt(0);
-  window.animationReady = true;
+  // Camera travels through four *continuous* perspectives. No random cuts.
+  const cuts=[
+    {time:0, pos:v(1.65,3.1,8.3),look:v(-.32,1.30,0)},
+    {time:2.2, pos:v(3.0,2.85,7.0),look:v(-.12,1.35,.12)},
+    {time:4.6, pos:v(3.1,2.95,5.85),look:v(.12,1.58,.28)},
+    {time:6.3, pos:v(.30,2.55,6.25),look:v(-.05,1.55,.25)},
+    {time:8.0, pos:v(-2.1,2.95,7.3),look:v(-.20,1.48,.18)}
+  ];
+  let i=0;while(i<cuts.length-2 && t>cuts[i+1].time)i++;
+  const c=cuts[i],next=cuts[i+1];
+  const alpha=smooth(c.time,next.time,t);
+  const basePos=mixVec(c.pos,next.pos,alpha);
+  const focus=mixVec(c.look,next.look,alpha);
+  if(portrait)basePos.z+=.55; // preserve head, feet and pedestal on a tall frame
+  camera.position.copy(basePos);camera.lookAt(focus);
+  renderer.render(scene,camera);
+  renderer.getContext().finish();
+  return true;
+}
+window.renderAt=sceneAt;
+window.storyDuration=8;
+window.storyScenes=[
+  {start:0,end:1.85,action:'Robot walks in',sound:'four soft footsteps'},
+  {start:1.85,end:2.48,action:'Robot notices the crystal',sound:'curiosity chime'},
+  {start:2.48,end:3.48,action:'Robot reaches for crystal',sound:'arm movement whoosh'},
+  {start:3.48,end:4.70,action:'Robot lifts crystal',sound:'pickup click and ascending tone'},
+  {start:4.70,end:6.30,action:'Crystal activates; robot reacts',sound:'sparkle and delighted chord'},
+  {start:6.30,end:8,action:'Robot presents crystal and turns',sound:'turn whoosh and soft ending'}
+];
+sceneAt(0);
+window.animationReady=true;
 </script>
 </body>
 </html>
