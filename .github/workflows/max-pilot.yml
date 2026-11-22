@@ -1,0 +1,93 @@
+name: Render MAX Pilot — Adulting.EXE
+
+on:
+  workflow_dispatch:
+    inputs:
+      quality:
+        description: 'Choose preview to save free runner time'
+        type: choice
+        default: portrait-preview
+        options:
+          - portrait-preview
+          - portrait-hd
+          - portrait-full
+          - landscape-preview
+          - landscape-hd
+      fps:
+        description: '24 for first test; 30 for later'
+        type: choice
+        default: '24'
+        options:
+          - '24'
+          - '30'
+          - '60'
+
+permissions:
+  contents: read
+
+jobs:
+  render-max:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Three.js and Playwright
+        working-directory: adulting-pilot
+        run: npm install --no-audit --no-fund
+      - name: Install headless Chromium with software WebGL
+        working-directory: adulting-pilot
+        run: npx playwright install --with-deps --only-shell chromium
+      - name: Ensure FFmpeg is installed
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          ffmpeg -version | head -n 1
+      - name: Render the full 15-second MAX pilot with stereo sound
+        working-directory: adulting-pilot
+        shell: bash
+        env:
+          QUALITY: ${{ inputs.quality }}
+          FPS: ${{ inputs.fps }}
+        run: |
+          set -euo pipefail
+          case "$QUALITY" in
+            portrait-preview) W=432; H=768 ;;
+            portrait-hd) W=720; H=1280 ;;
+            portrait-full) W=1080; H=1920 ;;
+            landscape-preview) W=640; H=360 ;;
+            landscape-hd) W=1280; H=720 ;;
+            *) echo "Unknown quality: $QUALITY"; exit 1 ;;
+          esac
+          DURATION=15
+          echo "Rendering MAX for ${DURATION}s at ${W}x${H}, ${FPS} fps"
+          node render.mjs --width "$W" --height "$H" --fps "$FPS" --seconds "$DURATION"
+          python3 sound.py "$DURATION" output/sfx.wav
+          ffmpeg -hide_banner -loglevel error -y \
+            -framerate "$FPS" -i output/frame_%05d.png \
+            -i output/sfx.wav -map 0:v:0 -map 1:a:0 \
+            -c:v libx264 -preset veryfast -crf 21 -pix_fmt yuv420p \
+            -c:a aac -b:a 160k -ar 44100 -t "$DURATION" \
+            -movflags +faststart output/max-first-day-15s.mp4
+          ffprobe -v error -show_entries format=duration:stream=codec_type,codec_name,width,height,r_frame_rate -of json output/max-first-day-15s.mp4
+          for s in 1 5 8 11 14; do
+            n=$((s * FPS))
+            cp "output/frame_$(printf '%05d' "$n").png" "output/preview_${s}s.png"
+          done
+      - name: Download MP4, sound and real rendered frames
+        uses: actions/upload-artifact@v4
+        with:
+          name: MAX-first-day-15s-preview
+          path: |
+            adulting-pilot/output/max-first-day-15s.mp4
+            adulting-pilot/output/sfx.wav
+            adulting-pilot/output/preview_*.png
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
